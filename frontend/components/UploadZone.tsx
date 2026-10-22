@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "@/lib/api";
 
 interface Props {
     onSuccess: (documentId: string) => void;
@@ -20,7 +19,7 @@ export default function UploadZone({ onSuccess }: Props) {
             try {
                 const form = new FormData();
                 form.append("file", file);
-                const res = await fetch(`${API}/documents/upload`, {
+                const res = await apiFetch("/documents/upload", {
                     method: "POST",
                     body: form,
                 });

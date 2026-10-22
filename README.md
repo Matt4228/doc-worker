@@ -26,7 +26,7 @@ frontend/   Next.js app — upload UI, document list, chat window
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12
 - Node.js 18+
 - PostgreSQL running locally (or reachable via `DATABASE_URL`)
 - An Anthropic API key
@@ -42,12 +42,19 @@ pip install -r requirements.txt
 createdb docworker        # or create the database however you prefer
 
 cp .env.example .env
-# fill in DATABASE_URL and ANTHROPIC_API_KEY
+# fill in DATABASE_URL, ANTHROPIC_API_KEY, and DEMO_PASSWORD
 
 uvicorn main:app --reload
 ```
 
 Tables are created automatically on startup (`CREATE TABLE IF NOT EXISTS`) — there's no separate migration step.
+
+Run the tests from `backend/`:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ### Frontend
 
@@ -63,6 +70,8 @@ npm run dev
 Then open http://localhost:3000.
 
 ## API
+
+Every `/documents` and `/chat` request needs `Authorization: Bearer <DEMO_PASSWORD>`, and a missing or wrong password gets a 401. The check is attached where the routers are included in `main.py`, so new routes under those prefixes are protected automatically. It also fails closed: if `DEMO_PASSWORD` isn't set, the API answers 503 instead of serving requests. `/health` stays open for the host's health check, and `GET /auth/check` lets the frontend verify a password before saving it.
 
 | Method | Path | Description |
 |---|---|---|
