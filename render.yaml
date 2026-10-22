@@ -1,0 +1,28 @@
+# Render Blueprint for the FastAPI backend. The frontend deploys separately
+# on Vercel. Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: doc-worker-api
+    runtime: python
+    plan: free
+    # Same AWS region as the Neon database.
+    region: virginia
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # sync: false means Render asks for the value in its dashboard instead
+      # of reading it from this file, so secrets never reach git.
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+      # The Vercel URL, which only exists after the frontend's first deploy.
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-5-5

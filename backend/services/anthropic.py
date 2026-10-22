@@ -7,6 +7,17 @@ load_dotenv()
 
 client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
+# Haiku by default: the live demo runs on a capped budget, and document Q&A
+# doesn't need a bigger model. Set ANTHROPIC_MODEL to switch without a deploy.
+DEFAULT_MODEL = "claude-haiku-5-5"
+
+# Current models think before answering, and thinking tokens count toward
+# max_tokens. A tight cap like 1024 can be used up by thinking alone, leaving
+# no room for the answer.
+MAX_TOKENS = 16000
+
+NO_ANSWER = "I couldn't produce an answer to that. Try rephrasing the question."
+
 SYSTEM_PROMPT = """You are Doc Worker, an AI assitant that answers questions about documents.
 You will be given the full text of a document and a user question.
 Answer clearly and concisely, citing specific parts of the coument where relevant.
@@ -34,10 +45,17 @@ async def ask_question(
     messages.append({"role": "user", "content": message})
 
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
+        model=os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL),
+        max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         messages=messages,
     )
 
-    return response.content[0].text
+    # The response is a list of blocks, and with thinking on the first one is
+    # a thinking block with no .text. Only the text blocks are the answer.
+    answer = "".join(block.text for block in response.content if block.type == "text")
+
+    # A safety refusal (stop_reason "refusal") can come back with no text.
+    if response.stop_reason == "refusal" or not answer.strip():
+        return NO_ANSWER
+    return answer
