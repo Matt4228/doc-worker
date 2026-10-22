@@ -20,6 +20,12 @@ async def init_db():
                 content TEXT NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
+
+            -- Added after launch. ADD COLUMN IF NOT EXISTS upgrades the live
+            -- database in place on the next startup; rows uploaded before
+            -- this have no stored file and fall back to the text view.
+            ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_type TEXT;
+            ALTER TABLE documents ADD COLUMN IF NOT EXISTS file BYTEA;
                            
             CREATE TABLE IF NOT EXISTS messages (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

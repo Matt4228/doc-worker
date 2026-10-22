@@ -27,3 +27,55 @@ def client(monkeypatch):
 @pytest.fixture
 def auth_header():
     return {"Authorization": f"Bearer {PASSWORD}"}
+
+
+class FakeConnection:
+    """Records every query and returns whatever the test queued up, so route
+    tests run without Postgres."""
+
+    def __init__(self):
+        self.queries = []
+        self.fetchrow_result = None
+
+    async def fetchrow(self, query, *args):
+        self.queries.append((query, args))
+        return self.fetchrow_result
+
+    async def fetch(self, query, *args):
+        self.queries.append((query, args))
+        return []
+
+    async def execute(self, query, *args):
+        self.queries.append((query, args))
+        return "OK"
+
+
+class FakePool:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def acquire(self):
+        pool = self
+
+        class Acquire:
+            async def __aenter__(self):
+                return pool.conn
+
+            async def __aexit__(self, *exc):
+                return False
+
+        return Acquire()
+
+
+@pytest.fixture
+def fake_db(monkeypatch):
+    """Point the documents routes at a FakeConnection and return it."""
+    from routes import documents
+
+    conn = FakeConnection()
+
+    async def get_pool():
+        return FakePool(conn)
+
+    monkeypatch.setattr(documents, "get_pool", get_pool)
+    return conn
