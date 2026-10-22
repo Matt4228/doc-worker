@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import documents, chat
 from db import init_db
+from auth import require_demo_password
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -26,8 +27,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(documents.router, prefix="/documents", tags=["documents"])
-app.include_router(chat.router, prefix="/chat", tags=["chat"])
+# Attached at the router level so every current and future route under
+# /documents and /chat is protected without each one having to opt in.
+protected = [Depends(require_demo_password)]
+
+app.include_router(documents.router, prefix="/documents", tags=["documents"], dependencies=protected)
+app.include_router(chat.router, prefix="/chat", tags=["chat"], dependencies=protected)
+
+@app.get("/auth/check", dependencies=protected)
+def auth_check():
+    """Lets the frontend verify a password before saving it."""
+    return {"ok": True}
 
 @app.get("/health")
 def health():
