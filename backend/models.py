@@ -13,6 +13,11 @@ class DocumentSummary(BaseModel):
     filename: str
     created_at: datetime
 
+class DocumentDetail(DocumentSummary):
+    content_type: Optional[str]
+    has_file: bool  # whether the original PDF is stored and can be rendered
+    content: str  # extracted text, shown when there's no file to render
+
 class ChatMessage(BaseModel):
     role: str # "user" or "assistant"
     content: str
