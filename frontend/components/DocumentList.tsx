@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "@/lib/api";
 
 interface Doc {
     id: string;
@@ -16,7 +15,7 @@ export default function DocumentList() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch(`${API}/documents/`)
+        apiFetch("/documents/")
             .then((r) => r.json())
             .then((data) => setDocs(data))
             .catch(console.error)

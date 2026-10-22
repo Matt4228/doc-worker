@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "@/lib/api";
 
 interface Message {
     role: "user" | "assistant";
@@ -20,7 +19,7 @@ export default function ChatWindow({ documentId }: Props) {
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        fetch(`${API}/chat/${documentId}/history`)
+        apiFetch(`/chat/${documentId}/history`)
             .then((r) => r.json())
             .then((data) => setMessages(data))
             .catch(console.error);
@@ -40,7 +39,7 @@ export default function ChatWindow({ documentId }: Props) {
         setLoading(true);
 
         try {
-            const res = await fetch(`${API}/chat/`, {
+            const res = await apiFetch("/chat/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
