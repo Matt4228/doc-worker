@@ -35,3 +35,9 @@ async def init_db():
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
         """)
+
+async def close_db():
+    global _pool
+    if _pool is not None:
+        await _pool.close()
+        _pool = None
