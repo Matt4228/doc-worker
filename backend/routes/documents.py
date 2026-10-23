@@ -69,8 +69,8 @@ async def list_documents():
         rows = await conn.fetch("SELECT id, filename, created_at FROM documents ORDER BY created_at DESC")
     return [DocumentSummary(id=str(r["id"]), filename=r["filename"], created_at=r["created_at"]) for r in rows]
 
-# document_id is typed uuid.UUID on the new routes, so FastAPI answers a
-# malformed id with a 422 instead of uuid.UUID() raising a 500 (see #4).
+# document_id is typed uuid.UUID, so FastAPI answers a malformed id with a
+# 422 instead of uuid.UUID() raising a 500 (see #4).
 @router.get("/{document_id}", response_model=DocumentDetail)
 async def get_document(document_id: uuid.UUID):
     """Return a document's metadata and extracted text (never the file bytes)."""
@@ -110,11 +110,11 @@ async def get_document_file(document_id: uuid.UUID):
     )
 
 @router.delete("/{document_id}")
-async def delete_document(document_id: str):
+async def delete_document(document_id: uuid.UUID):
     """Delete a document and its associated chat history."""
     pool = await get_pool()
     async with pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM documents WHERE id = $1", uuid.UUID(document_id))
+        result = await conn.execute("DELETE FROM documents WHERE id = $1", document_id)
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Document not found.")
-    return {"deleted": document_id}
+    return {"deleted": str(document_id)}

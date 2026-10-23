@@ -36,6 +36,7 @@ class FakeConnection:
     def __init__(self):
         self.queries = []
         self.fetchrow_result = None
+        self.fetch_result = []
 
     async def fetchrow(self, query, *args):
         self.queries.append((query, args))
@@ -43,7 +44,7 @@ class FakeConnection:
 
     async def fetch(self, query, *args):
         self.queries.append((query, args))
-        return []
+        return self.fetch_result
 
     async def execute(self, query, *args):
         self.queries.append((query, args))
@@ -69,8 +70,8 @@ class FakePool:
 
 @pytest.fixture
 def fake_db(monkeypatch):
-    """Point the documents routes at a FakeConnection and return it."""
-    from routes import documents
+    """Point the documents and chat routes at a FakeConnection and return it."""
+    from routes import chat, documents
 
     conn = FakeConnection()
 
@@ -78,4 +79,5 @@ def fake_db(monkeypatch):
         return FakePool(conn)
 
     monkeypatch.setattr(documents, "get_pool", get_pool)
+    monkeypatch.setattr(chat, "get_pool", get_pool)
     return conn

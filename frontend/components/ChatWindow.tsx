@@ -14,6 +14,14 @@ interface Props {
     filename?: string;
 }
 
+// Matches MAX_MESSAGE_CHARS in backend/models.py.
+const MAX_MESSAGE_CHARS = 4000;
+
+const GENERIC_ERROR = "Couldn't get an answer. Check your connection and try again.";
+
+/** An error whose message came from the backend and is safe to show as is. */
+class ChatError extends Error {}
+
 const SUGGESTIONS = [
     "Summarize this document",
     "What are the key points?",
@@ -24,7 +32,7 @@ export default function ChatWindow({ documentId, filename }: Props) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
-    const [failedQuestion, setFailedQuestion] = useState<string | null>(null);
+    const [failed, setFailed] = useState<{ question: string; reason: string } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -45,27 +53,33 @@ export default function ChatWindow({ documentId, filename }: Props) {
         const question = text.trim();
         if (!question || loading) return;
 
-        const history = messages;
-        setMessages([...history, { role: "user", content: question }]);
+        const previous = messages;
+        setMessages([...previous, { role: "user", content: question }]);
         setInput("");
-        setFailedQuestion(null);
+        setFailed(null);
         setLoading(true);
 
         try {
             const res = await apiFetch("/chat/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ document_id: documentId, message: question, history }),
+                // Only the new question: the server reads the earlier turns
+                // from its own copy of the conversation.
+                body: JSON.stringify({ document_id: documentId, message: question }),
             });
             // Without this check an error response's body has no .answer,
-            // which used to render as an empty assistant bubble.
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            // which used to render as an empty assistant bubble. Busy (503)
+            // and AI-service (502) errors explain themselves in `detail`.
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw typeof body?.detail === "string" ? new ChatError(body.detail) : new Error(`HTTP ${res.status}`);
+            }
             const data = await res.json();
             setMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
-        } catch {
+        } catch (err) {
             // Take the unanswered question back out so Retry doesn't send it twice.
-            setMessages(history);
-            setFailedQuestion(question);
+            setMessages(previous);
+            setFailed({ question, reason: err instanceof ChatError ? err.message : GENERIC_ERROR });
         } finally {
             setLoading(false);
         }
@@ -135,12 +149,12 @@ export default function ChatWindow({ documentId, filename }: Props) {
             </div>
 
             <div className="shrink-0 border-t border-gray-800 p-4">
-                {failedQuestion && (
+                {failed && (
                     <div role="alert" className="mb-3 flex items-center justify-between gap-3 text-sm text-red-400">
-                        <span>Couldn&apos;t get an answer. Check your connection and try again.</span>
+                        <span>{failed.reason}</span>
                         <button
                             type="button"
-                            onClick={() => send(failedQuestion)}
+                            onClick={() => send(failed.question)}
                             className="shrink-0 rounded-md px-2 py-1 font-medium text-red-300 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-red-400"
                         >
                             Retry
@@ -163,6 +177,7 @@ export default function ChatWindow({ documentId, filename }: Props) {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={onKeyDown}
+                        maxLength={MAX_MESSAGE_CHARS}
                         placeholder="Ask a question about this document..."
                         className="field-sizing-content max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2.5 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none"
                     />
