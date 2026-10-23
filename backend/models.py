@@ -1,6 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
+import uuid
+
+# Long enough for any real question, short enough that one request can't
+# carry a pasted book. The chat box enforces the same limit.
+MAX_MESSAGE_CHARS = 4000
 
 class Document(BaseModel):
     id: str
@@ -22,10 +27,11 @@ class ChatMessage(BaseModel):
     role: str # "user" or "assistant"
     content: str
 
+# No history field: the server reads the conversation from the database.
+# Older clients that still send one have it ignored.
 class ChatRequest(BaseModel):
-    document_id: str
-    message: str
-    history: list[ChatMessage] = []
+    document_id: uuid.UUID
+    message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
 
 class ChatResponse(BaseModel):
     answer: str
