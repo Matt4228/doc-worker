@@ -27,7 +27,7 @@ export default function DocumentList() {
 
     return (
         <div>
-            <h2 className="text-gray-400 text-sm font-medium uppercase tracking widest mb-4">
+            <h2 className="text-gray-400 text-sm font-medium uppercase tracking-widest mb-4">
                 Previous Documents
             </h2>
             <ul className="space-y-2">

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import documents, chat
-from db import init_db
+from db import init_db, close_db
 from auth import require_demo_password
 from dotenv import load_dotenv
 load_dotenv()
@@ -12,6 +12,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     await init_db()
     yield
+    await close_db()
 
 app = FastAPI(
     title="Doc Worker API",

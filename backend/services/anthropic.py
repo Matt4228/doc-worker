@@ -18,9 +18,9 @@ MAX_TOKENS = 16000
 
 NO_ANSWER = "I couldn't produce an answer to that. Try rephrasing the question."
 
-SYSTEM_PROMPT = """You are Doc Worker, an AI assitant that answers questions about documents.
+SYSTEM_PROMPT = """You are Doc Worker, an AI assistant that answers questions about documents.
 You will be given the full text of a document and a user question.
-Answer clearly and concisely, citing specific parts of the coument where relevant.
+Answer clearly and concisely, citing specific parts of the document where relevant.
 If the answer cannot be found in the document, say so honestly."""
 
 async def ask_question(
@@ -36,7 +36,7 @@ async def ask_question(
     })
     messages.append({
         "role": "assistant",
-        "content": "Understood. I have read the doument and am ready to answer your questions.",
+        "content": "Understood. I have read the document and am ready to answer your questions.",
     })
 
     for msg in history:
