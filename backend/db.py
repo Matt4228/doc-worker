@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS chunks (
 );
 CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks (document_id);
 CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING GIN (tsv);
+
+-- The sources an answer cited, so a reloaded chat keeps its citations.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS sources JSONB;
 """
 
 async def init_db():
