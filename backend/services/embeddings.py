@@ -6,10 +6,10 @@ import httpx
 # would pull in LangChain's text splitters, a tokenizer and numpy for what is
 # one POST request.
 VOYAGE_URL = "https://api.voyageai.com/v1/embeddings"
-EMBED_MODEL = "voyage-3.5"
+EMBED_MODEL = "voyage-4"
 EMBED_DIM = 1024  # must match vector(1024) in db.py
 
-# Texts per request. A 350-word chunk is about 500 tokens, so a batch stays
+# Texts per request. A 350-word schunk is about 500 tokens, so a batch stays
 # well under Voyage's per-request token limit.
 EMBED_BATCH = 128
 
