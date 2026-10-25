@@ -17,3 +17,4 @@ node_modules/
 # Misc
 .DS_Store
 *.pem
+backend/eval/data/
