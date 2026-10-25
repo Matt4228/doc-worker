@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Response
-from services.parser import extract_text
+from services.parser import extract_pages
 from db import get_pool
 from models import DocumentDetail, DocumentSummary
 import uuid
@@ -37,26 +37,30 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File does not appear to be a valid PDF.")
 
     try:
-        content = extract_text(raw, file.content_type)
+        pages = extract_pages(raw, file.content_type)
     except Exception:
         raise HTTPException(status_code=422, detail="Could not read this file.")
 
+    content = "\n\n".join(pages)
     if not content.strip():
         raise HTTPException(status_code=422, detail="Could not extract text from this file.")
     
-    # Keep the original PDF so the chat page can render it. Text files are
-    # fully represented by their extracted content, so there's nothing to keep.
-    original = raw if file.content_type == "application/pdf" else None
+    # Keep the original PDF so the chat page can render it, and its per-page
+    # text so answers can cite pages. A text file is fully represented by its
+    # content and has no pages, so it stores neither.
+    is_pdf = file.content_type == "application/pdf"
+    original = raw if is_pdf else None
 
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO documents (filename, content, content_type, file) VALUES ($1, $2, $3, $4) "
+            "INSERT INTO documents (filename, content, content_type, file, pages) VALUES ($1, $2, $3, $4, $5) "
             "RETURNING id, filename, created_at",
             file.filename,
             content,
             file.content_type,
             original,
+            pages if is_pdf else None,
         )
 
     return DocumentSummary(id=str(row["id"]), filename=row["filename"], created_at=row["created_at"])

@@ -65,10 +65,10 @@ def test_get_file_is_404_when_none_was_stored(client, auth_header, fake_db):
     assert response.status_code == 404
 
 
-def test_pdf_upload_stores_the_original_bytes(client, auth_header, fake_db, monkeypatch):
+def test_pdf_upload_stores_the_original_bytes_and_pages(client, auth_header, fake_db, monkeypatch):
     from routes import documents
 
-    monkeypatch.setattr(documents, "extract_text", lambda raw, content_type: "text from pdf")
+    monkeypatch.setattr(documents, "extract_pages", lambda raw, content_type: ["page one", "page two"])
     fake_db.fetchrow_result = row()
     response = client.post(
         "/documents/upload",
@@ -77,7 +77,7 @@ def test_pdf_upload_stores_the_original_bytes(client, auth_header, fake_db, monk
     )
     assert response.status_code == 200
     _, args = fake_db.queries[0]
-    assert args == ("report.pdf", "text from pdf", "application/pdf", PDF_BYTES)
+    assert args == ("report.pdf", "page one\n\npage two", "application/pdf", PDF_BYTES, ["page one", "page two"])
 
 
 def test_text_upload_stores_no_file(client, auth_header, fake_db):
@@ -89,4 +89,5 @@ def test_text_upload_stores_no_file(client, auth_header, fake_db):
     )
     assert response.status_code == 200
     _, args = fake_db.queries[0]
-    assert args == ("notes.txt", "plain notes", "text/plain", None)
+    # A text file has no pages, so it stores none and gets no page citations.
+    assert args == ("notes.txt", "plain notes", "text/plain", None, None)
