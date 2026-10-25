@@ -1,7 +1,7 @@
 import anthropic
 from fastapi import APIRouter, HTTPException
 from models import ChatMessage, ChatRequest, ChatResponse
-from services.anthropic import ask_question
+from services.anthropic import ask_question, whole_context
 from db import get_pool
 import uuid
 
@@ -37,10 +37,11 @@ async def chat(request: ChatRequest):
     # 429 and 529 are temporary, so the visitor is told to retry. Anything
     # else from the API is our problem, not theirs: a 502, not a raw 500.
     try:
-        answer = await ask_question(
-            document_content=row["content"],
+        result = await ask_question(
+            context=whole_context(None, row["content"]),
             message=request.message,
             history=history,
+            mode="whole",
         )
     except (anthropic.RateLimitError, anthropic.OverloadedError):
         raise HTTPException(status_code=503, detail="The AI service is busy. Try again in a minute.")
@@ -55,10 +56,10 @@ async def chat(request: ChatRequest):
         )
         await conn.execute(
             "INSERT INTO messages (document_id, role, content) VALUES ($1, $2, $3)",
-            request.document_id, "assistant", answer,
+            request.document_id, "assistant", result.text,
         )
 
-    return ChatResponse(answer=answer, document_id=str(request.document_id))
+    return ChatResponse(answer=result.text, document_id=str(request.document_id), mode="whole")
 
 @router.get("/{document_id}/history")
 async def get_history(document_id: uuid.UUID):

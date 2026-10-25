@@ -19,11 +19,13 @@ def fake_ask(monkeypatch):
 
     record = {"answer": "The answer."}
 
-    async def ask_question(document_content, message, history):
-        record.update(document_content=document_content, message=message, history=history)
+    async def ask_question(context, message, history, mode):
+        from services.anthropic import AnswerResult
+
+        record.update(context=context, message=message, history=history, mode=mode)
         if "raises" in record:
             raise record["raises"]
-        return record["answer"]
+        return AnswerResult(text=record["answer"], input_tokens=0, output_tokens=0)
 
     monkeypatch.setattr(chat, "ask_question", ask_question)
     return record
@@ -98,7 +100,7 @@ def test_history_sent_to_the_model_is_capped(client, auth_header, fake_db, fake_
 def test_exchange_is_saved_after_an_answer(client, auth_header, fake_db, fake_ask):
     fake_db.fetchrow_result = {"content": "doc text"}
     response = post(client, auth_header)
-    assert response.json() == {"answer": "The answer.", "document_id": DOC_ID}
+    assert response.json() == {"answer": "The answer.", "document_id": DOC_ID, "sources": [], "mode": "whole"}
     saved = [args[1:] for query, args in fake_db.queries if query.startswith("INSERT")]
     assert saved == [("user", "question"), ("assistant", "The answer.")]
 
