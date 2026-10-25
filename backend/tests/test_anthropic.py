@@ -36,7 +36,7 @@ def text(value):
 def fake(monkeypatch):
     def install(resp):
         messages = FakeMessages(resp)
-        monkeypatch.setattr(service, "client", SimpleNamespace(messages=messages))
+        monkeypatch.setattr(service, "default_client", SimpleNamespace(messages=messages))
         return messages
 
     return install
@@ -141,3 +141,14 @@ def test_retrieval_context_numbers_chunks_with_pages():
 
     chunks = [Retrieved(id=1, page=212, content="undo it"), Retrieved(id=2, page=None, content="notes")]
     assert service.retrieval_context(chunks) == "[1] (page 212)\nundo it\n\n[2]\nnotes"
+
+
+def test_a_given_client_is_used_instead_of_the_module_client(fake):
+    # The eval passes its own client so it never spends the demo's key.
+    fake(response(text("module")))
+    own = FakeMessages(response(text("own")))
+    result = asyncio.run(service.ask_question(
+        context="doc", message="q", history=[], mode="whole", client=SimpleNamespace(messages=own),
+    ))
+    assert result.text == "own"
+    assert own.request is not None

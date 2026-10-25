@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+default_client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 # Haiku by default: the live demo runs on a capped budget, and document Q&A
 # doesn't need a bigger model. Set ANTHROPIC_MODEL to switch without a deploy.
@@ -58,7 +58,9 @@ async def ask_question(
     history: list[ChatMessage],
     mode: Literal["whole", "retrieval"],
     model: str | None = None,
+    client: anthropic.AsyncAnthropic | None = None,
 ) -> AnswerResult:
+    """client and model let the eval use its own key and model."""
     history_messages = [{"role": msg.role, "content": msg.content} for msg in history]
 
     if mode == "whole":
@@ -76,7 +78,7 @@ async def ask_question(
             {"role": "user", "content": f"Excerpts from the document:\n\n{context}\n\nQuestion: {message}"},
         ]
 
-    response = await client.messages.create(
+    response = await (client or default_client).messages.create(
         model=model or os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL),
         max_tokens=MAX_TOKENS,
         system=WHOLE_PROMPT if mode == "whole" else RETRIEVAL_PROMPT,
