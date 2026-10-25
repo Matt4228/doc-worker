@@ -1,5 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Response
 from services.parser import extract_pages
+from services.chunker import chunk_pages
+from services.embeddings import EmbeddingBusy, EmbeddingError
+from services.indexing import embed_chunks, store_chunks
 from db import get_pool
 from models import DocumentDetail, DocumentSummary
 import uuid
@@ -51,8 +54,21 @@ async def upload_document(file: UploadFile = File(...)):
     is_pdf = file.content_type == "application/pdf"
     original = raw if is_pdf else None
 
+    # Every upload is indexed, short ones too, so the size threshold for
+    # retrieval can change later without re-indexing anything. Embedding
+    # happens before any write, so a failure here saves nothing.
+    chunks = chunk_pages(pages, paged=is_pdf)
+    try:
+        vectors = await embed_chunks(chunks)
+    except EmbeddingBusy:
+        raise HTTPException(status_code=503, detail="The embedding service is busy. Try again in a minute.")
+    except EmbeddingError:
+        raise HTTPException(status_code=502, detail="Couldn't index this document. Try again.")
+
     pool = await get_pool()
-    async with pool.acquire() as conn:
+    # One transaction: the document and its chunks are saved together or
+    # not at all.
+    async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             "INSERT INTO documents (filename, content, content_type, file, pages) VALUES ($1, $2, $3, $4, $5) "
             "RETURNING id, filename, created_at",
@@ -62,6 +78,7 @@ async def upload_document(file: UploadFile = File(...)):
             original,
             pages if is_pdf else None,
         )
+        await store_chunks(conn, row["id"], chunks, vectors)
 
     return DocumentSummary(id=str(row["id"]), filename=row["filename"], created_at=row["created_at"])
 

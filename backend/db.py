@@ -37,6 +37,22 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Per-page text, so answers can cite pages. NULL for .txt uploads and for
 -- documents uploaded before this column existed.
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS pages TEXT[];
+
+-- Retrieval: each chunk is a passage of one page with its embedding (for
+-- meaning search) and a tsvector (for keyword search). Postgres keeps tsv
+-- up to date itself, since it's generated from content.
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE IF NOT EXISTS chunks (
+    id BIGSERIAL PRIMARY KEY,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    chunk_index INT NOT NULL,
+    page INT,
+    content TEXT NOT NULL,
+    embedding vector(1024) NOT NULL,
+    tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+);
+CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks (document_id);
+CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING GIN (tsv);
 """
 
 async def init_db():
