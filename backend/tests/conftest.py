@@ -50,6 +50,19 @@ class FakeConnection:
         self.queries.append((query, args))
         return "OK"
 
+    async def executemany(self, query, rows):
+        self.queries.append((query, list(rows)))
+
+    def transaction(self):
+        class Transaction:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+        return Transaction()
+
 
 class FakePool:
     def __init__(self, conn):
@@ -81,3 +94,30 @@ def fake_db(monkeypatch):
     monkeypatch.setattr(documents, "get_pool", get_pool)
     monkeypatch.setattr(chat, "get_pool", get_pool)
     return conn
+
+
+@pytest.fixture
+def fake_embed(monkeypatch):
+    """Replace the Voyage calls with fixed 1024-dim vectors and record what
+    was sent. Set record["raises"] to an exception to make them fail."""
+    from services import embeddings
+
+    record = {"documents": [], "queries": []}
+
+    def maybe_raise():
+        if "raises" in record:
+            raise record["raises"]
+
+    async def embed_documents(texts):
+        maybe_raise()
+        record["documents"].append(list(texts))
+        return [[0.0] * embeddings.EMBED_DIM for _ in texts]
+
+    async def embed_query(text):
+        maybe_raise()
+        record["queries"].append(text)
+        return [0.0] * embeddings.EMBED_DIM
+
+    monkeypatch.setattr(embeddings, "embed_documents", embed_documents)
+    monkeypatch.setattr(embeddings, "embed_query", embed_query)
+    return record

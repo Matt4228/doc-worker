@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 import uuid
 
 # Long enough for any real question, short enough that one request can't
@@ -33,6 +33,15 @@ class ChatRequest(BaseModel):
     document_id: uuid.UUID
     message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
 
+# A passage an answer can cite. In retrieval mode it's a retrieved chunk;
+# in whole-document mode only the page is known.
+class Source(BaseModel):
+    id: Optional[int]    # chunk id, None in whole-document mode
+    page: Optional[int]  # 1-based PDF page, None for .txt files
+    text: Optional[str]  # the passage, None in whole-document mode
+
 class ChatResponse(BaseModel):
-    answer: str
+    answer: str  # [[n]] markers refer to sources[n - 1]
     document_id: str
+    sources: list[Source] = []
+    mode: Literal["whole", "retrieval"]

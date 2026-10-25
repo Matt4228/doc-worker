@@ -65,10 +65,10 @@ def test_get_file_is_404_when_none_was_stored(client, auth_header, fake_db):
     assert response.status_code == 404
 
 
-def test_pdf_upload_stores_the_original_bytes(client, auth_header, fake_db, monkeypatch):
+def test_pdf_upload_stores_the_original_bytes_and_pages(client, auth_header, fake_db, fake_embed, monkeypatch):
     from routes import documents
 
-    monkeypatch.setattr(documents, "extract_text", lambda raw, content_type: "text from pdf")
+    monkeypatch.setattr(documents, "extract_pages", lambda raw, content_type: ["page one", "page two"])
     fake_db.fetchrow_result = row()
     response = client.post(
         "/documents/upload",
@@ -77,10 +77,10 @@ def test_pdf_upload_stores_the_original_bytes(client, auth_header, fake_db, monk
     )
     assert response.status_code == 200
     _, args = fake_db.queries[0]
-    assert args == ("report.pdf", "text from pdf", "application/pdf", PDF_BYTES)
+    assert args == ("report.pdf", "page one\n\npage two", "application/pdf", PDF_BYTES, ["page one", "page two"])
 
 
-def test_text_upload_stores_no_file(client, auth_header, fake_db):
+def test_text_upload_stores_no_file(client, auth_header, fake_db, fake_embed):
     fake_db.fetchrow_result = row(filename="notes.txt")
     response = client.post(
         "/documents/upload",
@@ -89,4 +89,42 @@ def test_text_upload_stores_no_file(client, auth_header, fake_db):
     )
     assert response.status_code == 200
     _, args = fake_db.queries[0]
-    assert args == ("notes.txt", "plain notes", "text/plain", None)
+    # A text file has no pages, so it stores none and gets no page citations.
+    assert args == ("notes.txt", "plain notes", "text/plain", None, None)
+
+
+def upload_txt(client, auth_header, text=b"plain notes"):
+    return client.post(
+        "/documents/upload",
+        headers=auth_header,
+        files={"file": ("notes.txt", text, "text/plain")},
+    )
+
+
+def test_upload_indexes_the_document(client, auth_header, fake_db, fake_embed):
+    fake_db.fetchrow_result = row(filename="notes.txt")
+    response = upload_txt(client, auth_header)
+    assert response.status_code == 200
+    assert fake_embed["documents"] == [["plain notes"]]
+    query, rows = fake_db.queries[1]
+    assert "INSERT INTO chunks" in query
+    assert len(rows) == 1
+
+
+def test_upload_embedding_busy_is_503_and_saves_nothing(client, auth_header, fake_db, fake_embed):
+    from services.embeddings import EmbeddingBusy
+
+    fake_embed["raises"] = EmbeddingBusy()
+    response = upload_txt(client, auth_header)
+    assert response.status_code == 503
+    assert "busy" in response.json()["detail"]
+    assert fake_db.queries == []
+
+
+def test_upload_embedding_error_is_502_and_saves_nothing(client, auth_header, fake_db, fake_embed):
+    from services.embeddings import EmbeddingError
+
+    fake_embed["raises"] = EmbeddingError()
+    response = upload_txt(client, auth_header)
+    assert response.status_code == 502
+    assert fake_db.queries == []
